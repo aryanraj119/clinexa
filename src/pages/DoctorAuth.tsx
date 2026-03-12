@@ -39,7 +39,20 @@ const DoctorAuth = () => {
 
     if (roles.length > 0) {
       const doctorId = roles[0].doctor_id;
-      navigate(`/doctor/${doctorId}`);
+      const doctors = runQuery("doctors").filter((d: any) => d.id === doctorId);
+      
+      if (doctors.length > 0) {
+        const doctor = doctors[0];
+        if (doctor.rejected) {
+          setError("Your account has been rejected. Please contact support.");
+        } else if (!doctor.verified) {
+          setError("Your account is pending verification. Please wait for admin approval.");
+        } else {
+          navigate(`/doctor/${doctorId}`);
+        }
+      } else {
+        setError("Doctor profile not found");
+      }
     } else {
       setError("No doctor account found with this email");
     }
@@ -87,6 +100,8 @@ const DoctorAuth = () => {
       rating: 5.0,
       reviews_count: 0,
       city: "New York",
+      verified: false,
+      rejected: false,
       created_at: new Date().toISOString()
     });
 
@@ -97,7 +112,7 @@ const DoctorAuth = () => {
       created_at: new Date().toISOString()
     });
 
-    navigate(`/doctor/${doctorId}`);
+    alert("Registration submitted! Your account is pending approval by admin. You will be notified once verified.");
     setLoading(false);
   };
 
