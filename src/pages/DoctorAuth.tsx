@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Logo } from "@/components/Logo";
-import { runQuery, insertRecord, generateId } from "@/integrations/local-db";
+import { runQuery, insertRecord, generateId, localDb } from "@/integrations/local-db";
 
 const SPECIALIZATIONS = [
   { id: "spec-1", name: "Ophthalmology" },
@@ -34,29 +34,47 @@ const DoctorAuth = () => {
     setLoading(true);
     setError("");
 
-    const users = runQuery("users").filter((u: any) => u.email === email && u.password === password && u.is_doctor);
-    const roles = runQuery("user_roles").filter((r: any) => r.role === "doctor" && users.some((u: any) => u.id === r.user_id));
+    // Find the doctor user
+    const users = runQuery("users").filter(
+      (u: any) => u.email === email && u.password === password && u.is_doctor
+    );
 
-    if (roles.length > 0) {
-      const doctorId = roles[0].doctor_id;
-      const doctors = runQuery("doctors").filter((d: any) => d.id === doctorId);
-      
-      if (doctors.length > 0) {
-        const doctor = doctors[0];
-        if (doctor.rejected) {
-          setError("Your account has been rejected. Please contact support.");
-        } else if (!doctor.verified) {
-          setError("Your account is pending verification. Please wait for admin approval.");
-        } else {
-          navigate("/doctor-dashboard");
-        }
-      } else {
-        setError("Doctor profile not found");
-      }
-    } else {
-      setError("No doctor account found with this email");
+    if (users.length === 0) {
+      setError("No doctor account found with this email or incorrect password.");
+      setLoading(false);
+      return;
     }
 
+    const matchedUser = users[0];
+    const roles = runQuery("user_roles").filter(
+      (r: any) => r.role === "doctor" && r.user_id === matchedUser.id
+    );
+
+    if (roles.length === 0) {
+      setError("No doctor role found for this account.");
+      setLoading(false);
+      return;
+    }
+
+    const doctorId = roles[0].doctor_id;
+    const doctors = runQuery("doctors").filter((d: any) => d.id === doctorId);
+
+    if (doctors.length === 0) {
+      setError("Doctor profile not found.");
+      setLoading(false);
+      return;
+    }
+
+    if (doctors[0].rejected) {
+      setError("Your account has been rejected. Please contact support.");
+      setLoading(false);
+      return;
+    }
+
+    // Set the auth session so dashboard can read it
+    await localDb.auth.signInWithPassword({ email, password });
+
+    navigate("/doctor-dashboard");
     setLoading(false);
   };
 
@@ -100,7 +118,7 @@ const DoctorAuth = () => {
       rating: 5.0,
       reviews_count: 0,
       city: "New York",
-      verified: false,
+      verified: true,
       rejected: false,
       created_at: new Date().toISOString()
     });
@@ -112,10 +130,10 @@ const DoctorAuth = () => {
       created_at: new Date().toISOString()
     });
 
-    alert("Registration submitted! Your account is pending approval by admin. You will be notified once verified.");
-    // Navigate to home after successful registration
-    setTimeout(() => navigate("/"), 1500);
+    // Auto-sign-in after registration
+    await localDb.auth.signInWithPassword({ email, password });
     setLoading(false);
+    navigate("/doctor-dashboard");
   };
 
   return (
