@@ -48,7 +48,7 @@ const DoctorAuth = () => {
         } else if (!doctor.verified) {
           setError("Your account is pending verification. Please wait for admin approval.");
         } else {
-          navigate(`/doctor/${doctorId}`);
+          navigate("/doctor-dashboard");
         }
       } else {
         setError("Doctor profile not found");
@@ -113,6 +113,8 @@ const DoctorAuth = () => {
     });
 
     alert("Registration submitted! Your account is pending approval by admin. You will be notified once verified.");
+    // Navigate to home after successful registration
+    setTimeout(() => navigate("/"), 1500);
     setLoading(false);
   };
 

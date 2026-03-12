@@ -91,7 +91,9 @@ const SEED_DATA: typeof SCHEMA = {
     { id: 'bi-23', blood_bank_id: 'bb-3', blood_type: 'O+', units_available: 25, last_updated: new Date().toISOString() },
     { id: 'bi-24', blood_bank_id: 'bb-3', blood_type: 'O-', units_available: 10, last_updated: new Date().toISOString() }
   ],
-  users: [],
+  users: [
+    { id: 'admin-1', email: 'admin@clinexa.com', password: 'admin123', full_name: 'Admin', is_admin: true, created_at: new Date().toISOString() }
+  ],
   profiles: [],
   appointments: [],
   reviews: [],
@@ -133,6 +135,7 @@ export function initDatabase(): typeof SCHEMA {
   
   if (savedData) {
     db = savedData;
+    ensureAdminUser();
   } else {
     db = JSON.parse(JSON.stringify(SEED_DATA));
     saveToStorage();
@@ -140,6 +143,25 @@ export function initDatabase(): typeof SCHEMA {
 
   console.log('Database initialized with', Object.keys(db).reduce((acc, key) => acc + db[key as keyof typeof db].length, 0), 'records');
   return db;
+}
+
+function ensureAdminUser() {
+  const users = db.users as any[];
+  const adminExists = users.some((u: any) => u.is_admin === true);
+  
+  if (!adminExists) {
+    const adminUser = { 
+      id: 'admin-1', 
+      email: 'admin@clinexa.com', 
+      password: 'admin123', 
+      full_name: 'Admin', 
+      is_admin: true, 
+      created_at: new Date().toISOString() 
+    };
+    db.users.push(adminUser);
+    saveToStorage();
+    console.log('Admin user added');
+  }
 }
 
 export function getDatabase(): typeof SCHEMA {

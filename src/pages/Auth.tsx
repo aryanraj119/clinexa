@@ -54,6 +54,8 @@ const Auth = () => {
         title: "Welcome back!",
         description: "You have successfully signed in",
       });
+      // Navigate to home after successful sign in
+      setTimeout(() => navigate("/"), 1000);
     }
 
     setLoading(false);

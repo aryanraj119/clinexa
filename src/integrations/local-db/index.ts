@@ -171,6 +171,26 @@ export const localDb = {
         };
       }
     };
+  },
+  adminAuth: {
+    login: async (email: string, password: string) => {
+      const users = runQuery('users').filter((u: any) => u.email === email && u.password === password && u.is_admin);
+      if (users.length > 0) {
+        currentUser = { id: users[0].id, email: users[0].email };
+        return { success: true, error: null };
+      }
+      return { success: false, error: 'Invalid admin credentials' };
+    },
+    logout: async () => {
+      currentUser = null;
+      return { success: true };
+    },
+    isAdmin: () => {
+      return currentUser !== null;
+    },
+    getAdminUser: () => {
+      return currentUser;
+    }
   }
 };
 

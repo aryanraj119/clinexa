@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Logo } from "@/components/Logo";
-import { runQuery, updateRecord } from "@/integrations/local-db/client";
+import { localDb } from "@/integrations/local-db";
 
 const TABLES = [
   "users",
@@ -26,21 +28,60 @@ export default function DatabaseViewer() {
   const [selectedTable, setSelectedTable] = useState("users");
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loggingIn, setLoggingIn] = useState(false);
 
   useEffect(() => {
-    fetchData();
-  }, [selectedTable]);
+    const admin = localDb.adminAuth.getAdminUser();
+    if (admin) {
+      setIsLoggedIn(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isLoggedIn) {
+      fetchData();
+    }
+  }, [selectedTable, isLoggedIn]);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoggingIn(true);
+    setError("");
+
+    const result = await localDb.adminAuth.login(email, password);
+    
+    if (result.success) {
+      setIsLoggedIn(true);
+    } else {
+      setError(result.error || "Invalid credentials");
+    }
+    setLoggingIn(false);
+  };
+
+  const handleLogout = async () => {
+    await localDb.adminAuth.logout();
+    setIsLoggedIn(false);
+    setEmail("");
+    setPassword("");
+  };
 
   const fetchData = () => {
     setLoading(true);
     try {
-      const results = runQuery(selectedTable);
-      setData(results as any[]);
+      const results = localDb.from(selectedTable).select();
+      (results as any).then((res: { data: any[] }) => {
+        setData(res.data || []);
+        setLoading(false);
+      });
     } catch (e) {
       console.error(e);
       setData([]);
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleClearData = () => {
@@ -51,16 +92,80 @@ export default function DatabaseViewer() {
   };
 
   const handleVerifyDoctor = (doctorId: string) => {
-    updateRecord("doctors", doctorId, { verified: true, rejected: false });
+    localDb.from("doctors").update({ verified: true, rejected: false }).eq("id", doctorId);
     fetchData();
   };
 
   const handleRejectDoctor = (doctorId: string) => {
     if (confirm("Are you sure you want to reject this doctor?")) {
-      updateRecord("doctors", doctorId, { verified: false, rejected: true });
+      localDb.from("doctors").update({ verified: false, rejected: true }).eq("id", doctorId);
       fetchData();
     }
   };
+
+  if (!isLoggedIn) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-muted/30 to-background p-4">
+        <Card className="w-full max-w-md p-8">
+          <div className="text-center mb-8">
+            <div className="mb-4 flex justify-center">
+              <Logo showText={false} />
+            </div>
+            <h1 className="text-3xl font-bold mb-2">Admin Login</h1>
+            <p className="text-muted-foreground">
+              Enter your admin credentials
+            </p>
+          </div>
+
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm">
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="admin@clinexa.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </div>
+            <Button type="submit" className="w-full" disabled={loggingIn}>
+              {loggingIn ? "Signing in..." : "Sign In"}
+            </Button>
+          </form>
+
+          <div className="mt-6 text-center">
+            <Button variant="ghost" asChild>
+              <Link to="/">Back to Home</Link>
+            </Button>
+          </div>
+
+          <div className="mt-4 p-3 bg-muted rounded-lg text-sm text-muted-foreground">
+            <p className="font-medium">Default Admin Credentials:</p>
+            <p>Email: admin@clinexa.com</p>
+            <p>Password: admin123</p>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   const renderDoctorsTable = () => (
     <Card>
@@ -193,6 +298,9 @@ export default function DatabaseViewer() {
             <Logo />
           </Link>
           <div className="flex items-center gap-4">
+            <Button variant="ghost" onClick={handleLogout}>
+              Logout
+            </Button>
             <Button variant="ghost" asChild>
               <Link to="/">← Back to Home</Link>
             </Button>
